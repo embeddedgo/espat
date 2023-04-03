@@ -1,4 +1,4 @@
-// Client a is an example TCP/UDP client.
+// Client is an example of TCP/UDP client.
 package main
 
 import (
@@ -27,8 +27,8 @@ func main() {
 		fr  = flag.Bool("r", false, "reboot the ESP-AT device first")
 		fs  = flag.Bool("s", false, "single connection mode (CIPMUX=0)")
 		fu  = flag.Bool("u", false, "UDP client instead of TCP")
-		ftr = flag.Uint("tr", 0, "read timeout timeout [s]")
-		ftw = flag.Uint("tw", 0, "wirte timeout timeout [s]")
+		ftr = flag.Uint("tr", 0, "read timeout [s]")
+		ftw = flag.Uint("tw", 0, "wirte timeout [s]")
 	)
 	flag.Usage = func() {
 		fmt.Println("Usage:")
@@ -40,7 +40,7 @@ func main() {
 		fmt.Println("Examples:")
 		fmt.Println("  client -r /dev/ttyUSB0 192.168.1.100:1234")
 		fmt.Println("  client -r /dev/ttyUSB0 [fe80::3aea:12ff:fe34:5678]:1234")
-		fmt.Println("  client -r -u /dev/ttyUSB0 somesevrer:1234")
+		fmt.Println("  client -r -u /dev/ttyUSB0 test.server.local:1234")
 	}
 
 	flag.Parse()
@@ -52,7 +52,7 @@ func main() {
 
 	var options int
 	if *fr {
-		options |= espnet.Reset
+		options |= espnet.Reboot
 	}
 	if *fa {
 		options |= espnet.ActiveRecv
@@ -63,23 +63,25 @@ func main() {
 	rto := time.Duration(*ftr) * time.Second
 	wto := time.Duration(*ftw) * time.Second
 
+	// Setup the UART interface.
 	uart, err := serial.Open(flag.Arg(0))
 	fatalErr(err)
 	fatalErr(uart.SetSpeed(*fb))
+
+	// Initialize the ESP-AT device.
 	dev := espnet.NewDevice("esp0", uart, uart)
 	fatalErr(dev.Init(options))
-
 	if *fr {
-	loop:
+	waitForIP:
 		for {
 			select {
+			case msg := <-dev.ESPAT().Async():
+				if msg == "WIFI GOT IP" {
+					break waitForIP
+				}
 			case <-time.After(5 * time.Second):
 				fmt.Println("Cannot obtain an IP address: timeout.")
 				os.Exit(1)
-			case msg := <-dev.ESPAT().Async():
-				if msg == "WIFI GOT IP" {
-					break loop
-				}
 			}
 		}
 	}
@@ -97,9 +99,9 @@ func main() {
 	fatalErr(err)
 	fmt.Println("\r\n[connected]\r\n")
 
-	// sender
+	// Sender.
 	go func() {
-		var buf [4096]byte
+		var buf [4096]byte // big buffer to test ESP-AT 2048 bytes write limit
 		for {
 			n, err := os.Stdin.Read(buf[:])
 			if n != 0 {
@@ -111,14 +113,15 @@ func main() {
 				fmt.Print("\r\n[ ", n, " sent ]\r\n\r\n")
 			}
 			if err == io.EOF {
+				fatalErr(conn.Close())
 				os.Exit(0)
 			}
 			fatalErr(err)
 		}
 	}()
 
-	// receiver
-	var buf [1024]byte
+	// Receiver.
+	var buf [64]byte // small buffer to test reading in chunks
 	for {
 		if rto != 0 {
 			conn.SetReadDeadline(time.Now().Add(rto))

@@ -18,13 +18,13 @@ func NewDevice(name string, r io.Reader, w io.Writer) *Device {
 
 // Init options
 const (
-	Reset      = 1 << 0 // reset the device (recommended)
+	Reboot     = 1 << 0 // reboot the device (recommended)
 	SingleConn = 1 << 1 // single connection mode
 	ActiveRecv = 1 << 2 // active receive mode (not recommended)
 )
 
 func (d *Device) Init(options int) error {
-	if err := d.dev.Init(options&Reset != 0); err != nil {
+	if err := d.dev.Init(options&Reboot != 0); err != nil {
 		return err
 	}
 	if _, err := d.dev.Cmd("+CIPMUX=", ^options>>1&1); err != nil {

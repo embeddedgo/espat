@@ -1,4 +1,4 @@
-*.elf
-*.bin
-*.test
-core
+# Ignore all files without extension
+*
+!*.*
+!*/
