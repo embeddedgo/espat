@@ -2,13 +2,15 @@ package espnet
 
 import (
 	"strings"
+
+	"github.com/embeddedgo/espat"
 )
 
 const maxConns = 10 // keep in sync with ../receiver.go
 
-func getSockAddrs(d *Device) ([]string, error) {
+func getSockAddrs(d *espat.Device) ([]string, error) {
 	cmdColon := "+CIPSTATUS:"
-	status, err := d.dev.CmdStr(cmdColon[:len(cmdColon)-1])
+	status, err := d.CmdStr(cmdColon[:len(cmdColon)-1])
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +42,7 @@ func (a *netAddr) Network() string { return a.net }
 func (a *netAddr) String() string  { return a.str }
 
 // The returned strings are newly allocated and does not refer to the sa.
-func parseSockAddr(sa string) (addr netAddr, port string, server bool) {
+func parseSockAddr(sa, sport string) (addr netAddr, port string, server bool) {
 	i := strings.IndexByte(sa, ',')
 	if i < 0 {
 		return
@@ -71,7 +73,11 @@ func parseSockAddr(sa string) (addr netAddr, port string, server bool) {
 		return
 	}
 	server = sa[0] == '1'
-	port = ":" + p
+	if sport == "" {
+		port = ":" + p
+	} else {
+		port = sport
+	}
 	addr.net = proto
 	ipv6 := strings.IndexByte(aa, ':') >= 0
 	n := len(aa) + 1 + len(ap)

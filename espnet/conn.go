@@ -66,11 +66,15 @@ func DialDev(d *Device, network, address string) (*Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	sas, err := getSockAddrs(d)
+	return newConn(d, conn, network, "")
+}
+
+func newConn(d *Device, conn *espat.Conn, net, sport string) (*Conn, error) {
+	sas, err := getSockAddrs(d.dev)
 	if err != nil {
 		return nil, err
 	}
-	c := &Conn{d: d, conn: conn, net: network, rtim: time.NewTimer(0)}
+	c := &Conn{d: d, conn: conn, net: net, rtim: time.NewTimer(0)}
 	ci := conn.ID
 	if ci < 0 {
 		ci = 0
@@ -78,13 +82,13 @@ func DialDev(d *Device, network, address string) (*Conn, error) {
 	ci += '0' // maxConns must be <= 9
 	for _, sa := range sas {
 		if int(sa[0]) == ci {
-			c.raddr, c.laddr.str, _ = parseSockAddr(sa[2:])
+			c.raddr, c.laddr.str, _ = parseSockAddr(sa[2:], sport)
 			c.laddr.net = c.raddr.net
 			break
 		}
 	}
 	<-c.rtim.C // unfortunately this is the only way to get a stopped timer
-	return c, err
+	return c, nil
 }
 
 // Read implements the net.Conn Read method.
