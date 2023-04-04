@@ -57,9 +57,9 @@ func main() {
 	if err != nil {
 		fatalErr(fmt.Errorf("bad TCP port: %w", err))
 	}
-	active := 0
+	active := 1
 	if *fa {
-		active = 1
+		active = 0
 	}
 
 	uart, err := serial.Open(flag.Arg(0))
@@ -84,8 +84,9 @@ func main() {
 	_, err = d.Cmd("+CIPSERVER=1,", int(port))
 	fatalErr(err)
 
-	var sendMutex sync.Mutex
+	fmt.Println("Waiting for TCP connections...")
 
+	var sendMutex sync.Mutex
 	for conn := range d.Server() {
 		go handle(d, conn, &sendMutex, *fa)
 	}
