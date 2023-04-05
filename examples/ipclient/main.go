@@ -100,9 +100,9 @@ func main() {
 				_, err = d.Cmd("+CIPSEND=", conn.ID, n)
 			}
 			fatalErr(err)
-			_, err = d.Write(s.Bytes())
+			_, err = d.UnsafeWrite(s.Bytes())
 			fatalErr(err)
-			_, err = d.Write(nl)
+			_, err = d.UnsafeWrite(nl)
 			fatalErr(err)
 			_, err := d.Cmd("")
 			fatalErr(err)

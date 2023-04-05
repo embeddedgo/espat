@@ -13,7 +13,7 @@ import (
 // Conn is an implementation of the net.Conn interface for TCP and UDP network
 // connections.
 type Conn struct {
-	d     *Device
+	d     *espat.Device
 	conn  *espat.Conn
 	net   string
 	laddr netAddr
@@ -23,7 +23,7 @@ type Conn struct {
 	adata []byte
 }
 
-func DialDev(d *Device, network, address string) (*Conn, error) {
+func DialDev(d *espat.Device, network, address string) (*Conn, error) {
 	var proto6 string
 	switch network {
 	case "tcp", "tcp6", "tcp4":
@@ -62,15 +62,15 @@ func DialDev(d *Device, network, address string) (*Conn, error) {
 	if err != nil {
 		return nil, &net.AddrError{Err: "unknown port", Addr: port}
 	}
-	conn, err := d.dev.CmdConn("+CIPSTARTEX=", proto, host, int(pn))
+	conn, err := d.CmdConn("+CIPSTARTEX=", proto, host, int(pn))
 	if err != nil {
 		return nil, err
 	}
 	return newConn(d, conn, network, "")
 }
 
-func newConn(d *Device, conn *espat.Conn, net, sport string) (*Conn, error) {
-	sas, err := getSockAddrs(d.dev)
+func newConn(d *espat.Device, conn *espat.Conn, net, sport string) (*Conn, error) {
+	sas, err := getSockAddrs(d)
 	if err != nil {
 		return nil, err
 	}
@@ -131,21 +131,21 @@ func (c *Conn) Read(p []byte) (n int, err error) {
 		ai++
 	}
 	aa[ai] = len(p)
-	n, err = c.d.dev.CmdInt("+CIPRECVDATA=", aa[:ai+1]...)
+	n, err = c.d.CmdInt("+CIPRECVDATA=", aa[:ai+1]...)
 	if err != nil {
 		err = netOpError(c, "read", err)
 	}
 	return
 }
 
-func sendStart(c *Conn, n int) (m int, err error) {
+func send(c *Conn, n int) (m int, err error) {
 	var aa [4]any
 	ai := 0
 	if c.conn.ID >= 0 {
 		aa[ai] = c.conn.ID
 		ai++
 	}
-	c.d.mt.Lock()
+	c.d.Lock()
 	if !c.wdl.IsZero() {
 		to := int(c.wdl.Sub(time.Now()) / time.Millisecond)
 		if to <= 0 {
@@ -155,7 +155,7 @@ func sendStart(c *Conn, n int) (m int, err error) {
 		aa[ai+0] = -1
 		aa[ai+1] = 0
 		aa[ai+2] = to
-		_, err = c.d.dev.Cmd("+CIPTCPOPT=", aa[:ai+3]...)
+		_, err = c.d.UnsafeCmd("+CIPTCPOPT=", aa[:ai+3]...)
 		if err != nil {
 			return
 		}
@@ -165,7 +165,7 @@ func sendStart(c *Conn, n int) (m int, err error) {
 		m = 2048
 	}
 	aa[ai] = m
-	_, err = c.d.dev.Cmd("+CIPSEND=", aa[:ai+1]...)
+	_, err = c.d.UnsafeCmd("+CIPSEND=", aa[:ai+1]...)
 	return
 }
 
@@ -173,16 +173,16 @@ func sendStart(c *Conn, n int) (m int, err error) {
 func (c *Conn) Write(p []byte) (n int, err error) {
 	for len(p) != 0 {
 		var m int
-		m, err = sendStart(c, len(p))
+		m, err = send(c, len(p))
 		if err == nil {
-			m, err = c.d.dev.Write(p[:m])
+			m, err = c.d.UnsafeWrite(p[:m])
 			if err == nil {
-				_, err = c.d.dev.Cmd("")
+				_, err = c.d.UnsafeCmd("")
 				n += m
 				p = p[m:]
 			}
 		}
-		c.d.mt.Unlock()
+		c.d.Unlock()
 		if err != nil {
 			err = netOpError(c, "write", err)
 			return
@@ -195,16 +195,16 @@ func (c *Conn) Write(p []byte) (n int, err error) {
 func (c *Conn) WriteString(p string) (n int, err error) {
 	for len(p) != 0 {
 		var m int
-		m, err = sendStart(c, len(p))
+		m, err = send(c, len(p))
 		if err == nil {
-			m, err = c.d.dev.WriteString(p[:m])
+			m, err = c.d.UnsafeWriteString(p[:m])
 			if err == nil {
-				_, err = c.d.dev.Cmd("")
+				_, err = c.d.UnsafeCmd("")
 				n += m
 				p = p[m:]
 			}
 		}
-		c.d.mt.Unlock()
+		c.d.Unlock()
 		if err != nil {
 			err = netOpError(c, "write", err)
 			return
@@ -228,7 +228,7 @@ func (c *Conn) Close() error {
 		an = 1
 	}
 	_ = aa[:an]
-	_, err = c.d.dev.Cmd(cmd, aa[:an]...)
+	_, err = c.d.Cmd(cmd, aa[:an]...)
 	if err != nil {
 		err = netOpError(c, "close", err)
 	}
@@ -252,9 +252,9 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 
 // SetWriteDeadline implements the net.Conn SetWriteDeadline method.
 func (c *Conn) SetWriteDeadline(t time.Time) error {
-	c.d.mt.Lock() // use device mutex to avoid locking two mutexes in sendStart
+	c.d.Lock() // use device mutex to avoid locking two mutexes in send
 	c.wdl = t
-	c.d.mt.Unlock() // immediately unlocked so it shouldn't be very inefficient
+	c.d.Unlock() // immediately unlocked so it shouldn't be very inefficient
 	return nil
 }
 

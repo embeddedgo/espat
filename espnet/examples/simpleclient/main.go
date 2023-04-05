@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/embeddedgo/espat"
 	"github.com/embeddedgo/espat/espnet"
 	"github.com/ziutek/serial"
 )
@@ -36,12 +37,13 @@ func main() {
 	fatalErr(uart.SetSpeed(115200))
 
 	// Initialize the ESP-AT device.
-	dev := espnet.NewDevice("esp0", uart, uart)
-	fatalErr(dev.Init(espnet.Reboot))
+	dev := espat.NewDevice("esp0", uart, uart)
+	fatalErr(dev.Init(true))
+
 waitForIP:
 	for {
 		select {
-		case msg := <-dev.ESPAT().Async():
+		case msg := <-dev.Async():
 			if msg == "WIFI GOT IP" {
 				break waitForIP
 			}
@@ -53,19 +55,18 @@ waitForIP:
 
 	conn, err := espnet.DialDev(dev, "tcp", os.Args[2])
 	fatalErr(err)
-	fmt.Println("\r\n[connected]\r\n")
 
 	// Sender
 	go func() {
-		var buf [4096]byte // big buffer to test ESP-AT 2048 bytes write limit
+		var buf [1024]byte
 		for {
 			n, err := os.Stdin.Read(buf[:])
 			if n != 0 {
 				_, err = conn.Write(buf[:n])
 				fatalErr(err)
-				fmt.Print("\r\n[ ", n, " sent ]\r\n\r\n")
 			}
 			if err == io.EOF {
+				fatalErr(conn.Close())
 				os.Exit(0)
 			}
 			fatalErr(err)
@@ -73,11 +74,10 @@ waitForIP:
 	}()
 
 	// Receiver
-	var buf [64]byte // small buffer to test reading in chunks
+	var buf [1024]byte
 	for {
 		n, err := conn.Read(buf[:])
 		if n != 0 {
-			fmt.Print("\r\n[", n, " received]\r\n\r\n")
 			_, err := os.Stdout.Write(buf[:n])
 			fatalErr(err)
 		}

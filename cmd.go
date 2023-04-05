@@ -18,8 +18,7 @@ func processCmd(d *Device) {
 	var buf [128]byte
 	for cmd := range d.cmdq {
 		if cmd.name != "" {
-			err := writeCmd(d.w, &buf, cmd.name, cmd.args)
-			if err != nil {
+			if err := writeCmd(d.w, &buf, cmd.name, cmd.args); err != nil {
 				cmd.resp = err
 				cmd.ready.Unlock()
 				continue

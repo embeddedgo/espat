@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/embeddedgo/espat"
 	"github.com/embeddedgo/espat/espnet"
 	"github.com/ziutek/serial"
 )
@@ -40,18 +41,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	port, err := strconv.Atoi(os.Args[2])
+	fatalErr(err)
+
 	// Setup the UART interface.
 	uart, err := serial.Open(os.Args[1])
 	fatalErr(err)
 	fatalErr(uart.SetSpeed(115200))
 
 	// Initialize the ESP-AT device.
-	dev := espnet.NewDevice("esp0", uart, uart)
-	fatalErr(dev.Init(espnet.Reboot))
+	dev := espat.NewDevice("esp0", uart, uart)
+	fatalErr(dev.Init(true))
+
 waitForIP:
 	for {
 		select {
-		case msg := <-dev.ESPAT().Async():
+		case msg := <-dev.Async():
 			if msg == "WIFI GOT IP" {
 				break waitForIP
 			}
@@ -60,8 +65,6 @@ waitForIP:
 			os.Exit(1)
 		}
 	}
-	port, err := strconv.Atoi(os.Args[2])
-	fatalErr(err)
 
 	ls, err := espnet.ListenDev(dev, "tcp", port)
 	fatalErr(err)

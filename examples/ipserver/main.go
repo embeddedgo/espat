@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"sync"
 
 	"github.com/embeddedgo/espat"
 	"github.com/ziutek/serial"
@@ -86,16 +85,15 @@ func main() {
 
 	fmt.Println("Waiting for TCP connections...")
 
-	var sendMutex sync.Mutex
 	for conn := range d.Server() {
-		go handle(d, conn, &sendMutex, *fa)
+		go handle(d, conn, *fa)
 	}
 }
 
 var welcome = []byte("Welcome to the Echo Server!\r\n")
 
-func handle(d *espat.Device, conn *espat.Conn, sendMutex *sync.Mutex, active bool) {
-	err := send(d, conn, sendMutex, welcome)
+func handle(d *espat.Device, conn *espat.Conn, active bool) {
+	err := send(d, conn, welcome)
 	if logErr(err) {
 		return
 	}
@@ -105,7 +103,7 @@ func handle(d *espat.Device, conn *espat.Conn, sendMutex *sync.Mutex, active boo
 			if !ok {
 				return // connection closed by remote part
 			}
-			if logErr(send(d, conn, sendMutex, data)) {
+			if logErr(send(d, conn, data)) {
 				return
 			}
 		}
@@ -119,22 +117,22 @@ func handle(d *espat.Device, conn *espat.Conn, sendMutex *sync.Mutex, active boo
 			if logErr(err) {
 				return
 			}
-			if logErr(send(d, conn, sendMutex, buf[:n])) {
+			if logErr(send(d, conn, buf[:n])) {
 				return
 			}
 		}
 	}
 }
 
-func send(d *espat.Device, conn *espat.Conn, mt *sync.Mutex, p []byte) error {
-	mt.Lock()
-	defer mt.Unlock()
-	if _, err := d.Cmd("+CIPSEND=", conn.ID, len(p)); err != nil {
+func send(d *espat.Device, conn *espat.Conn, p []byte) error {
+	d.Lock()
+	defer d.Unlock()
+	if _, err := d.UnsafeCmd("+CIPSEND=", conn.ID, len(p)); err != nil {
 		return err
 	}
-	if _, err := d.Write(p); err != nil {
+	if _, err := d.UnsafeWrite(p); err != nil {
 		return err
 	}
-	_, err := d.Cmd("")
+	_, err := d.UnsafeCmd("")
 	return err
 }

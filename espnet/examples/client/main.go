@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/embeddedgo/espat"
 	"github.com/embeddedgo/espat/espnet"
 	"github.com/ziutek/serial"
 )
@@ -50,16 +51,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	var options int
-	if *fr {
-		options |= espnet.Reboot
-	}
-	if *fa {
-		options |= espnet.ActiveRecv
-	}
-	if *fs {
-		options |= espnet.SingleConn
-	}
 	rto := time.Duration(*ftr) * time.Second
 	wto := time.Duration(*ftw) * time.Second
 
@@ -69,13 +60,17 @@ func main() {
 	fatalErr(uart.SetSpeed(*fb))
 
 	// Initialize the ESP-AT device.
-	dev := espnet.NewDevice("esp0", uart, uart)
-	fatalErr(dev.Init(options))
+	dev := espat.NewDevice("esp0", uart, uart)
+	fatalErr(dev.Init(*fr))
+	fatalErr(espnet.SetMultiConn(dev, !*fs))
+	fatalErr(espnet.SetPasvRecv(dev, !*fa))
+
+	// Wait for an IP address.
 	if *fr {
 	waitForIP:
 		for {
 			select {
-			case msg := <-dev.ESPAT().Async():
+			case msg := <-dev.Async():
 				if msg == "WIFI GOT IP" {
 					break waitForIP
 				}

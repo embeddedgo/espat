@@ -1,41 +1,23 @@
 package espnet
 
-import (
-	"io"
-	"sync"
+import "github.com/embeddedgo/espat"
 
-	"github.com/embeddedgo/espat"
-)
-
-type Device struct {
-	dev *espat.Device
-	mt  sync.Mutex
+// SetMultiConn enables/disables the multiple connection mode.
+func SetMultiConn(d *espat.Device, multiConn bool) error {
+	a := 0
+	if multiConn {
+		a = 1
+	}
+	_, err := d.Cmd("+CIPMUX=", a)
+	return err
 }
 
-func NewDevice(name string, r io.Reader, w io.Writer) *Device {
-	return &Device{dev: espat.NewDevice(name, r, w)}
-}
-
-// Init options
-const (
-	Reboot     = 1 << 0 // reboot the device (recommended)
-	SingleConn = 1 << 1 // single connection mode
-	ActiveRecv = 1 << 2 // active receive mode (not recommended)
-)
-
-func (d *Device) Init(options int) error {
-	if err := d.dev.Init(options&Reboot != 0); err != nil {
-		return err
+// SetPasvRecv enables/disables the passive receive mode.
+func SetPasvRecv(d *espat.Device, pasvRecv bool) error {
+	a := 0
+	if pasvRecv {
+		a = 1
 	}
-	if _, err := d.dev.Cmd("+CIPMUX=", ^options>>1&1); err != nil {
-		return err
-	}
-	if _, err := d.dev.Cmd("+CIPRECVMODE=", ^options>>2&1); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (d *Device) ESPAT() *espat.Device {
-	return d.dev
+	_, err := d.Cmd("+CIPRECVMODE=", a)
+	return err
 }

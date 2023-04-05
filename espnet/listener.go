@@ -3,31 +3,34 @@ package espnet
 import (
 	"net"
 	"strconv"
+
+	"github.com/embeddedgo/espat"
 )
 
 type Listener struct {
-	d *Device
+	d *espat.Device
 	a netAddr
 }
 
-func ListenDev(d *Device, network string, port int) (*Listener, error) {
-	dev := d.dev
-	if _, err := dev.Cmd("+CIPMUX=1"); err != nil {
+func ListenDev(d *espat.Device, network string, port int) (*Listener, error) {
+	if _, err := d.Cmd("+CIPMUX=1"); err != nil {
 		return nil, err
 	}
-	dev.SetServer(true)
-	if _, err := dev.Cmd("+CIPSERVER=1,", port); err != nil {
+	d.SetServer(true)
+	if _, err := d.Cmd("+CIPSERVER=1,", port); err != nil {
 		return nil, err
 	}
 	return &Listener{d, netAddr{network, ":" + strconv.Itoa(port)}}, nil
 }
 
 func (ls *Listener) Accept() (net.Conn, error) {
-	return newConn(ls.d, <-ls.d.dev.Server(), ls.a.net, ls.a.str)
+	c := <-ls.d.Server()
+	return newConn(ls.d, c, ls.a.net, ls.a.str)
 }
 
 func (ls *Listener) Close() error {
-	return nil
+	_, err := ls.d.Cmd("+CIPSERVER=0,1")
+	return err
 }
 
 func (ls *Listener) Addr() net.Addr {

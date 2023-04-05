@@ -29,7 +29,7 @@ func getSockAddrs(d *espat.Device) ([]string, error) {
 		if sa := status[i : i+k]; len(sa) >= 2 {
 			ret = append(ret, sa)
 		}
-		i = k + 1
+		i += k + 1
 	}
 	return ret, nil
 }
