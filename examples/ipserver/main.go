@@ -56,9 +56,9 @@ func main() {
 	if err != nil {
 		fatalErr(fmt.Errorf("bad TCP port: %w", err))
 	}
-	active := 1
+	passive := 1
 	if *fa {
-		active = 0
+		passive = 0
 	}
 
 	uart, err := serial.Open(flag.Arg(0))
@@ -77,7 +77,7 @@ func main() {
 
 	_, err = d.Cmd("+CIPMUX=1")
 	fatalErr(err)
-	_, err = d.Cmd("+CIPRECVMODE=", active)
+	_, err = d.Cmd("+CIPRECVMODE=", passive)
 	fatalErr(err)
 	d.SetServer(true)
 	_, err = d.Cmd("+CIPSERVER=1,", int(port))

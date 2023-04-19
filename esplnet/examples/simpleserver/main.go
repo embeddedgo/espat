@@ -4,13 +4,11 @@ package main
 import (
 	"fmt"
 	"io"
-	"net"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/embeddedgo/espat"
-	"github.com/embeddedgo/espat/espnet"
+	"github.com/embeddedgo/espat/esplnet"
 	"github.com/ziutek/serial"
 )
 
@@ -33,15 +31,12 @@ func fatalErr(err error) {
 func main() {
 	if len(os.Args) != 3 {
 		fmt.Println("Usage:")
-		fmt.Println("  simpleserver UART_DEVICE PORT")
+		fmt.Println("  simpleserver UART_DEVICE HOST:PORT")
 		fmt.Println()
 		fmt.Println("Example:")
-		fmt.Println("  simpleserver /dev/ttyUSB0 1234")
+		fmt.Println("  simpleserver /dev/ttyUSB0 :1234")
 		os.Exit(1)
 	}
-
-	port, err := strconv.Atoi(os.Args[2])
-	fatalErr(err)
 
 	// Setup the UART interface.
 	uart, err := serial.Open(os.Args[1])
@@ -65,7 +60,7 @@ waitForIP:
 		}
 	}
 
-	ls, err := espnet.ListenDev(dev, "tcp", port)
+	ls, err := esplnet.ListenDev(dev, "tcp", os.Args[2])
 	fatalErr(err)
 
 	fmt.Println("Waiting for TCP connections...")
@@ -76,7 +71,7 @@ waitForIP:
 	}
 }
 
-func handle(c net.Conn) {
+func handle(c *esplnet.Conn) {
 	fmt.Printf("- new connection: %s -> %s\n", c.RemoteAddr(), c.LocalAddr())
 	defer c.Close()
 	for {

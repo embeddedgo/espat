@@ -23,6 +23,7 @@ type Conn struct {
 	adata []byte
 }
 
+// DialDev works like net.Dial.
 func DialDev(d *espat.Device, network, address string) (*Conn, error) {
 	var proto6 string
 	switch network {
@@ -213,7 +214,7 @@ func (c *Conn) WriteString(p string) (n int, err error) {
 	return
 }
 
-// Close implements the net.Conn SetReadDeadline method.
+// Close implements the net.Conn Close method.
 func (c *Conn) Close() error {
 	var (
 		err error
@@ -227,7 +228,6 @@ func (c *Conn) Close() error {
 		aa[0] = c.conn.ID
 		an = 1
 	}
-	_ = aa[:an]
 	_, err = c.d.Cmd(cmd, aa[:an]...)
 	if err != nil {
 		err = netOpError(c, "close", err)

@@ -27,6 +27,11 @@ func NewDevice(name string, r io.Reader, w io.Writer) *Device {
 	return d
 }
 
+// Name returns the device name set by NewDevice.
+func (d *Device) Name() string {
+	return d.Name()
+}
+
 // Ready reports whether the device is ready to accept AT commands.
 func (d *Device) Ready() bool {
 	return atomic.LoadInt32(&d.receiver.ready) != 0
