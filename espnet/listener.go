@@ -2,37 +2,37 @@ package espnet
 
 import (
 	"net"
-	"strconv"
 
 	"github.com/embeddedgo/espat"
+	"github.com/embeddedgo/espat/esplnet"
 )
 
-type Listener struct {
-	d *espat.Device
-	a netAddr
-}
+// Listener wraps esplnet.Listener to implement the net.Listener interface.
+type Listener esplnet.Listener
 
-func ListenDev(d *espat.Device, network string, port int) (*Listener, error) {
-	if _, err := d.Cmd("+CIPMUX=1"); err != nil {
-		return nil, err
+// ListenDev works like the net.Listen function.
+func ListenDev(d *espat.Device, network, address string) (*Listener, error) {
+	ls, err := esplnet.ListenDev(d, network, address)
+	if err != nil {
+		return nil, &net.OpError{Op: "listen", Net: network, Err: err}
 	}
-	d.SetServer(true)
-	if _, err := d.Cmd("+CIPSERVER=1,", port); err != nil {
-		return nil, err
-	}
-	return &Listener{d, netAddr{network, ":" + strconv.Itoa(port)}}, nil
-}
-
-func (ls *Listener) Accept() (net.Conn, error) {
-	c := <-ls.d.Server()
-	return newConn(ls.d, c, ls.a.net, ls.a.str)
-}
-
-func (ls *Listener) Close() error {
-	_, err := ls.d.Cmd("+CIPSERVER=0,1")
-	return err
+	return (*Listener)(ls), nil
 }
 
 func (ls *Listener) Addr() net.Addr {
-	return &ls.a
+	return (*esplnet.Listener)(ls).Addr()
+}
+
+func (ls *Listener) Accept() (net.Conn, error) {
+	c, err := (*esplnet.Listener)(ls).Accept()
+	conn := (*Conn)(c)
+	return conn, netOpError(conn, "accept", err)
+}
+
+func (ls *Listener) Close() error {
+	err := (*esplnet.Listener)(ls).Close()
+	if err != nil {
+		err = &net.OpError{Op: "close", Net: ls.Addr().Network(), Err: err}
+	}
+	return err
 }

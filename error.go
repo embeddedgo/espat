@@ -21,6 +21,8 @@ func (e *Error) Timeout() bool {
 	return to
 }
 
+// ErrorESP represents an error code returned by ESP-AT. It is returned in the
+// Error.Err field.
 type ErrorESP struct {
 	Code string
 }
@@ -34,6 +36,7 @@ type timeoutError struct{}
 func (e timeoutError) Error() string { return "timeout" }
 func (e timeoutError) Timeout() bool { return true }
 
+// Errors that may be returned in the Error.Err field.
 var (
 	ErrTimeout  = &timeoutError{}
 	ErrParse    = errors.New("parse")

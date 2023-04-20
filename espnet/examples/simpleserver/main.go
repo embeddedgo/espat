@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/embeddedgo/espat"
@@ -36,12 +35,9 @@ func main() {
 		fmt.Println("  simpleserver UART_DEVICE PORT")
 		fmt.Println()
 		fmt.Println("Example:")
-		fmt.Println("  simpleserver /dev/ttyUSB0 1234")
+		fmt.Println("  simpleserver /dev/ttyUSB0 :1234")
 		os.Exit(1)
 	}
-
-	port, err := strconv.Atoi(os.Args[2])
-	fatalErr(err)
 
 	// Setup the UART interface.
 	uart, err := serial.Open(os.Args[1])
@@ -65,7 +61,7 @@ waitForIP:
 		}
 	}
 
-	ls, err := espnet.ListenDev(dev, "tcp", port)
+	ls, err := espnet.ListenDev(dev, "tcp", os.Args[2])
 	fatalErr(err)
 
 	fmt.Println("Waiting for TCP connections...")

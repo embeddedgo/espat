@@ -29,7 +29,7 @@ func NewDevice(name string, r io.Reader, w io.Writer) *Device {
 
 // Name returns the device name set by NewDevice.
 func (d *Device) Name() string {
-	return d.Name()
+	return d.name
 }
 
 // Ready reports whether the device is ready to accept AT commands.

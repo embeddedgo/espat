@@ -85,7 +85,7 @@ func (c *Conn) Read(p []byte) (n int, err error) {
 			return
 		}
 	case <-c.readTimer.C: // timeout
-		return 0, espat.ErrTimeout
+		return 0, &espat.Error{c.dev.Name(), "read", espat.ErrTimeout}
 	}
 	// passive mode
 	var args [3]any
@@ -111,7 +111,7 @@ func send(c *Conn, n int) (m int, err error) {
 	if !c.writeDeadline.IsZero() {
 		to := int(c.writeDeadline.Sub(time.Now()) / time.Millisecond)
 		if to <= 0 {
-			err = espat.ErrTimeout
+			err = &espat.Error{c.dev.Name(), "read", espat.ErrTimeout}
 			return
 		}
 		args[ai+0] = -1

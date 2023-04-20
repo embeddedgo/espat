@@ -40,8 +40,8 @@ func main() {
 		fmt.Println()
 		fmt.Println("Examples:")
 		fmt.Println("  client -r /dev/ttyUSB0 192.168.1.100:1234")
-		fmt.Println("  client -r /dev/ttyUSB0 [fe80::3aea:12ff:fe34:5678]:1234")
-		fmt.Println("  client -r -u /dev/ttyUSB0 test.server.local:1234")
+		fmt.Println("  client -r -u /dev/ttyUSB0 [fe80::3aea:12ff:fe34:5678]:1234")
+		fmt.Println("  client -r /dev/ttyUSB0 test.server.local:1234")
 	}
 
 	flag.Parse()
