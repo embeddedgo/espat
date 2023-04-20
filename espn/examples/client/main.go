@@ -1,3 +1,7 @@
+// Copyright 2023 The Embedded Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 // Client is an example of TCP/UDP client.
 package main
 
@@ -9,7 +13,7 @@ import (
 	"time"
 
 	"github.com/embeddedgo/espat"
-	"github.com/embeddedgo/espat/esplnet"
+	"github.com/embeddedgo/espat/espn"
 	"github.com/ziutek/serial"
 )
 
@@ -62,8 +66,8 @@ func main() {
 	// Initialize the ESP-AT device.
 	dev := espat.NewDevice("esp0", uart, uart)
 	fatalErr(dev.Init(*fr))
-	fatalErr(esplnet.SetMultiConn(dev, !*fs))
-	fatalErr(esplnet.SetPasvRecv(dev, !*fa))
+	fatalErr(espn.SetMultiConn(dev, !*fs))
+	fatalErr(espn.SetPasvRecv(dev, !*fa))
 
 	// Wait for an IP address.
 	if *fr {
@@ -90,7 +94,7 @@ func main() {
 		proto = proto[:3]
 	}
 
-	conn, err := esplnet.DialDev(dev, proto, addr)
+	conn, err := espn.DialDev(dev, proto, addr)
 	fatalErr(err)
 	fmt.Println("\r\n[connected]\r\n")
 

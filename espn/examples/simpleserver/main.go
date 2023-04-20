@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/embeddedgo/espat"
-	"github.com/embeddedgo/espat/esplnet"
+	"github.com/embeddedgo/espat/espn"
 	"github.com/ziutek/serial"
 )
 
@@ -60,7 +60,7 @@ waitForIP:
 		}
 	}
 
-	ls, err := esplnet.ListenDev(dev, "tcp", os.Args[2])
+	ls, err := espn.ListenDev(dev, "tcp", os.Args[2])
 	fatalErr(err)
 
 	fmt.Println("Waiting for TCP connections...")
@@ -71,7 +71,7 @@ waitForIP:
 	}
 }
 
-func handle(c *esplnet.Conn) {
+func handle(c *espn.Conn) {
 	fmt.Printf("- new connection: %s -> %s\n", c.RemoteAddr(), c.LocalAddr())
 	defer c.Close()
 	for {

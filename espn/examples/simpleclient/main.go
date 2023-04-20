@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/embeddedgo/espat"
-	"github.com/embeddedgo/espat/espnet"
+	"github.com/embeddedgo/espat/espn"
 	"github.com/ziutek/serial"
 )
 
@@ -53,7 +53,7 @@ waitForIP:
 		}
 	}
 
-	conn, err := espnet.DialDev(dev, "tcp", os.Args[2])
+	conn, err := espn.DialDev(dev, "tcp", os.Args[2])
 	fatalErr(err)
 
 	// Sender

@@ -4,15 +4,15 @@ import (
 	"net"
 
 	"github.com/embeddedgo/espat"
-	"github.com/embeddedgo/espat/esplnet"
+	"github.com/embeddedgo/espat/espn"
 )
 
-// Listener wraps esplnet.Listener to implement the net.Listener interface.
-type Listener esplnet.Listener
+// Listener wraps espn.Listener to implement the net.Listener interface.
+type Listener espn.Listener
 
 // ListenDev works like the net.Listen function.
 func ListenDev(d *espat.Device, network, address string) (*Listener, error) {
-	ls, err := esplnet.ListenDev(d, network, address)
+	ls, err := espn.ListenDev(d, network, address)
 	if err != nil {
 		return nil, &net.OpError{Op: "listen", Net: network, Err: err}
 	}
@@ -20,17 +20,17 @@ func ListenDev(d *espat.Device, network, address string) (*Listener, error) {
 }
 
 func (ls *Listener) Addr() net.Addr {
-	return (*esplnet.Listener)(ls).Addr()
+	return (*espn.Listener)(ls).Addr()
 }
 
 func (ls *Listener) Accept() (net.Conn, error) {
-	c, err := (*esplnet.Listener)(ls).Accept()
+	c, err := (*espn.Listener)(ls).Accept()
 	conn := (*Conn)(c)
 	return conn, netOpError(conn, "accept", err)
 }
 
 func (ls *Listener) Close() error {
-	err := (*esplnet.Listener)(ls).Close()
+	err := (*espn.Listener)(ls).Close()
 	if err != nil {
 		err = &net.OpError{Op: "close", Net: ls.Addr().Network(), Err: err}
 	}
