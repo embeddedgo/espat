@@ -12,6 +12,7 @@ type cmd struct {
 
 	ready sync.Mutex
 	resp  any
+	err   error
 }
 
 func processCmd(d *Device) {
@@ -19,7 +20,7 @@ func processCmd(d *Device) {
 	for cmd := range d.cmdq {
 		if cmd.name != "" {
 			if err := writeCmd(d.w, &buf, cmd.name, cmd.args); err != nil {
-				cmd.resp = err
+				cmd.err = err
 				cmd.ready.Unlock()
 				continue
 			}

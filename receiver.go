@@ -33,7 +33,6 @@ type receiver struct {
 	async  chan string
 	server atomic.Value
 	conns  [maxConns]chan []byte
-	ready  int32
 }
 
 func receiverInit(rcv *receiver) {
@@ -46,12 +45,13 @@ func receiverLoop(rcv *receiver, inp io.Reader) {
 		sb    strings.Builder
 		emptl bool
 		resp  any
+		rerr  error
 	)
 	r := bufio.NewReaderSize(inp, 128)
 	for {
 		line, err := r.ReadSlice('\n')
 		if err != nil && err != bufio.ErrBufferFull {
-			resp = err
+			rerr = err
 			goto sendResp
 		}
 		switch {
@@ -64,12 +64,12 @@ func receiverLoop(rcv *receiver, inp io.Reader) {
 				i = 7
 			}
 			if uint(ci) >= maxConns {
-				resp = ErrParse
+				rerr = ErrParse
 				goto sendResp
 			}
 			conn := rcv.conns[ci]
 			if conn == nil {
-				resp = ErrUnkConn
+				rerr = ErrUnkConn
 				goto sendResp
 			}
 			recvmode := -1
@@ -89,12 +89,12 @@ func receiverLoop(rcv *receiver, inp io.Reader) {
 				m, _ := strconv.Atoi(string(line[i:k]))
 				if m <= 0 {
 					close(conn) // avoid deadlock
-					resp = ErrParse
+					rerr = ErrParse
 					goto sendResp
 				}
 				pkt := make([]byte, m)
 				if err = readData(line[k+1:], r, pkt, m); err != nil {
-					resp = ErrParse
+					rerr = ErrParse
 					goto sendResp
 				}
 				conn <- pkt
@@ -103,7 +103,7 @@ func receiverLoop(rcv *receiver, inp io.Reader) {
 				conn <- nil
 				continue
 			default:
-				resp = ErrParse
+				rerr = ErrParse
 				goto sendResp
 			}
 		case len(line) > 15 && string(line[:13]) == "+CIPRECVDATA:":
@@ -114,12 +114,12 @@ func receiverLoop(rcv *receiver, inp io.Reader) {
 				}
 			}
 			if k == len(line) {
-				resp = ErrParse
+				rerr = ErrParse
 				goto sendResp
 			}
 			m, _ := strconv.Atoi(string(line[13:k]))
 			if m <= 0 {
-				resp = ErrParse
+				rerr = ErrParse
 				goto sendResp
 			}
 			cmd := <-rcv.cmd
@@ -131,14 +131,13 @@ func receiverLoop(rcv *receiver, inp io.Reader) {
 				buf = buf[:m] // readData requires len(buf) <= m
 			}
 			if err = readData(line[k+1:], r, buf, m); err != nil {
-				cmd.resp = err
+				cmd.err = err
 			} else if _, err = r.ReadSlice('\n'); err != nil {
-				cmd.resp = err
+				cmd.err = err
 			} else {
 				cmd.resp = len(buf)
 			}
 			cmd.ready.Unlock()
-			resp = nil
 			sb.Reset()
 			continue
 		}
@@ -163,13 +162,13 @@ func receiverLoop(rcv *receiver, inp io.Reader) {
 					if s == "" {
 						s = "socket"
 					}
-					resp = &ErrorESP{s}
+					rerr = &ErrorESP{s}
 				}
 				goto sendResp
 			}
 			if ok := string(line) == "SEND OK"; ok || string(line) == "SEND FAIL" {
 				if !ok {
-					resp = ErrTimeout // BUG? is "SEND FAIL" always a timeout?
+					rerr = ErrTimeout // BUG? is "SEND FAIL" always a timeout?
 				}
 				goto sendResp
 			}
@@ -187,7 +186,7 @@ func receiverLoop(rcv *receiver, inp io.Reader) {
 				// CIPMUX=1
 				ci = int(c) - '0'
 				if uint(ci) >= maxConns {
-					resp = ErrParse
+					rerr = ErrParse
 					goto sendResp
 				}
 				id = ci
@@ -210,10 +209,9 @@ func receiverLoop(rcv *receiver, inp io.Reader) {
 					rcv.conns[ci] = nil
 				}
 			}
-		case len(line) > 5 && string(line[:5]) == "WIFI ":
-			goto sendAsync
 		case string(line) == "ready":
-			atomic.StoreInt32(&rcv.ready, 1)
+			goto sendAsync
+		case len(line) > 5 && string(line[:5]) == "WIFI ":
 			goto sendAsync
 		default:
 			sb.Grow(len(line) + 1)
@@ -222,21 +220,30 @@ func receiverLoop(rcv *receiver, inp io.Reader) {
 		}
 		continue
 	sendResp:
-		{
+		// BUG: len(rcv.cmd) is racing with processCmd in case of rerr != nil
+		if len(rcv.cmd) != 0 || rerr == nil {
 			cmd := <-rcv.cmd
 			cmd.resp = resp
+			cmd.err = rerr
 			cmd.ready.Unlock()
 			resp = nil
+			rerr = nil
 			sb.Reset()
+			continue
 		}
-		continue
 	sendAsync:
 		{
-			if len(line) == 0 {
+			var msg string
+			switch {
+			case rerr != nil:
+				msg = rerr.Error()
+				rerr = nil
+			case len(line) != 0:
+				msg = string(line)
+			default:
 				continue
 			}
 			overrun := false
-			msg := string(line)
 		again:
 			select {
 			case rcv.async <- msg:

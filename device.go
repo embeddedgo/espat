@@ -3,7 +3,6 @@ package espat
 import (
 	"io"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -30,11 +29,6 @@ func NewDevice(name string, r io.Reader, w io.Writer) *Device {
 // Name returns the device name set by NewDevice.
 func (d *Device) Name() string {
 	return d.name
-}
-
-// Ready reports whether the device is ready to accept AT commands.
-func (d *Device) Ready() bool {
-	return atomic.LoadInt32(&d.receiver.ready) != 0
 }
 
 // Async returns a channel that can be used to wait for asynchronous messages
@@ -70,20 +64,29 @@ func (d *Device) SetServer(en bool) {
 // state (for 3 second max.) before executing the above commands.
 func (d *Device) Init(reset bool) error {
 	if reset {
-		// BUG: race with receiverLoop and restarting module, acceptable?
+	emptying:
+		for {
+			select {
+			case <-d.Async():
+				//
+			default:
+				break emptying
+			}
+		}
 		if _, err := d.Cmd("+RST"); err != nil {
 			return err
 		}
-		atomic.StoreInt32(&d.receiver.ready, 0)
-		i, wait := 0, 3
-		for ; i < wait; i++ {
-			time.Sleep(time.Second)
-			if d.Ready() {
-				break
+		timeout := time.After(2 * time.Second)
+	waiting:
+		for {
+			select {
+			case msg := <-d.Async():
+				if msg == "ready" {
+					break waiting
+				}
+			case <-timeout:
+				return &Error{d.name, "ready", ErrTimeout}
 			}
-		}
-		if i == wait {
-			return &Error{d.name, "ready", ErrTimeout}
 		}
 	}
 	if _, err := d.Cmd("E0"); err != nil {
@@ -92,7 +95,6 @@ func (d *Device) Init(reset bool) error {
 	if _, err := d.Cmd("+SYSLOG=1"); err != nil {
 		return err
 	}
-	atomic.StoreInt32(&d.receiver.ready, 1)
 	return nil
 
 }
@@ -119,10 +121,11 @@ func exec(d *Device, safe bool, name string, args []any) (resp any, err error) {
 		d.cmdx.Unlock()
 	}
 	c.ready.Lock()
-	if err, ok := c.resp.(error); ok {
-		return nil, &Error{d.name, name, err}
+	resp = c.resp
+	if c.err != nil {
+		err = &Error{d.name, name, c.err}
 	}
-	return c.resp, nil
+	return
 }
 
 // Cmd executes an AT command. Name should be a command name without the AT
