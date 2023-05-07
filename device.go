@@ -21,7 +21,7 @@ type Device struct {
 func NewDevice(name string, r io.Reader, w io.Writer) *Device {
 	d := &Device{name: name, cmdq: make(chan *cmd, 3), w: w}
 	receiverInit(&d.receiver)
-	go receiverLoop(&d.receiver, r)
+	go receiverLoop(d, r)
 	go processCmd(d)
 	return d
 }
@@ -32,12 +32,10 @@ func (d *Device) Name() string {
 }
 
 // Async returns a channel that can be used to wait for asynchronous messages
-// from ESP-AT device. They are called Active Message Reports in ESP-AT
-// documentation and provide information of state changes like WiFi connect,
-// disconnect, etc. If the async channel is full up two oldest messages are
-// removed and an empty message is sent before a new one to inform about the
-// channel overrun.
-func (d *Device) Async() <-chan string {
+// from ESP-AT device. The channel overflow is signaled by sending an empty
+// message. In such case up two oldest messages are removed from the channel and
+// the received message is placed right after the empty one.
+func (d *Device) Async() <-chan Async {
 	return d.receiver.async
 }
 
@@ -81,7 +79,8 @@ func (d *Device) Init(reset bool) error {
 		for {
 			select {
 			case msg := <-d.Async():
-				if msg == "ready" {
+				// There may be many noise-like errors afer reset, ignore all.
+				if msg.Str == "ready" {
 					break waiting
 				}
 			case <-timeout:
@@ -110,81 +109,57 @@ func (d *Device) Unlock() {
 	d.cmdx.Unlock()
 }
 
-func exec(d *Device, safe bool, name string, args []any) (resp any, err error) {
+// Cmd executes an AT command. Name should be a command name without the AT
+// prefix (e.g. "+GMR" instead of "AT+GMR"). Args may be of type string, int or
+// nil. The first argument can be also of type []byte and in a such case it may
+// be used as a receive buffer (for example the CIPRECVDATA command may read
+// data into it but is also allowed to discard all or part of received data if
+// the buffer was missing or too small). CmdStr, CmdInt, CmdConn can be used
+// instead of Cmd if the response type is known in advance.
+func (d *Device) Cmd(name string, args ...any) (resp *Response, err error) {
 	c := &cmd{name: name, args: args}
 	c.ready.Lock()
-	if safe {
-		d.cmdx.Lock()
-	}
+	d.cmdx.Lock()
 	d.cmdq <- c
-	if safe {
-		d.cmdx.Unlock()
-	}
+	d.cmdx.Unlock()
 	c.ready.Lock()
-	resp = c.resp
 	if c.err != nil {
 		err = &Error{d.name, name, c.err}
 	}
-	return
+	return &c.resp, err
 }
 
-// Cmd executes an AT command. Name should be a command name without the AT
-// prefix (e.g. "+GMR" instead of "AT+GMR"). Args may be of type nil, string,
-// int. The first argument can be also of type []byte and in a such case it may
-// be used as a receive buffer (for example the CIPRECVDATA command may read
-// data into it but is also allowed to discard all or part of received data if
-// the buffer was missing or too small). If err is nil the returned response
-// may be of type nil, string, int or *Conn. Use CmdStr, CmdInt if the
-// response type is known in advance.
-func (d *Device) Cmd(name string, args ...any) (resp any, err error) {
-	return exec(d, true, name, args)
+// UnsafeCmd is like Cmd but intended to be used with a locked device.
+func (d *Device) UnsafeCmd(name string, args ...any) (resp *Response, err error) {
+	c := &cmd{name: name, args: args}
+	c.ready.Lock()
+	d.cmdq <- c
+	c.ready.Lock()
+	if c.err != nil {
+		err = &Error{d.name, name, c.err}
+	}
+	return &c.resp, err
 }
 
 // CmdStr provides a convenient way to execute a command when a string response
 // is expected.
 func (d *Device) CmdStr(name string, args ...any) (string, error) {
-	resp, err := exec(d, true, name, args)
-	if err != nil {
-		return "", err
-	}
-	if resp == nil {
-		return "", nil
-	}
-	if s, ok := resp.(string); ok {
-		return s, nil
-	}
-	return "", &Error{d.name, name, ErrRespType}
+	resp, err := d.Cmd(name, args...)
+	return resp.Str, err
 }
 
 // CmdInt provides a convenient way to execute a command when an int response
 // is expected.
 func (d *Device) CmdInt(name string, args ...any) (int, error) {
-	resp, err := exec(d, true, name, args)
-	if err != nil {
-		return 0, err
-	}
-	if i, ok := resp.(int); ok {
-		return i, nil
-	}
-	return 0, &Error{d.name, name, ErrRespType}
+	resp, err := d.Cmd(name, args...)
+	return resp.Int, err
 }
 
 // CmdConn provides a convenient way to execute a command when a *Conn response
 // is expected.
 func (d *Device) CmdConn(name string, args ...any) (*Conn, error) {
-	resp, err := exec(d, true, name, args)
-	if err != nil {
-		return nil, err
-	}
-	if c, ok := resp.(*Conn); ok {
-		return c, nil
-	}
-	return nil, &Error{d.name, name, ErrRespType}
-}
-
-// UnsafeCmd is like Cmd but intended to be used with a locked device.
-func (d *Device) UnsafeCmd(name string, args ...any) (resp any, err error) {
-	return exec(d, false, name, args)
+	resp, err := d.Cmd(name, args...)
+	return resp.Conn, err
 }
 
 // UnsafeWrite works like io.Writer Write method. Device must be locked and

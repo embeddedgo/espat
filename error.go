@@ -41,6 +41,5 @@ var (
 	ErrTimeout  = &timeoutError{}
 	ErrParse    = errors.New("parse")
 	ErrArgType  = errors.New("argument type")
-	ErrRespType = errors.New("response type")
 	ErrUnkConn  = errors.New("unknown connection")
 )

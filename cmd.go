@@ -6,12 +6,18 @@ import (
 	"sync"
 )
 
+type Response struct {
+	Str  string
+	Int  int
+	Conn *Conn
+}
+
 type cmd struct {
 	name string
 	args []any
 
 	ready sync.Mutex
-	resp  any
+	resp  Response
 	err   error
 }
 

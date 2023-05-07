@@ -73,7 +73,8 @@ func main() {
 
 	if *fr {
 		for msg := range d.Async() {
-			if msg == "WIFI GOT IP" {
+			fatalErr(msg.Err)
+			if msg.Str == "WIFI GOT IP" {
 				break
 			}
 		}
@@ -83,8 +84,10 @@ func main() {
 	fatalErr(err)
 	_, err = d.Cmd("+CIPRECVMODE=", boolInt(!*fa))
 	fatalErr(err)
-	conn, err := d.CmdConn("+CIPSTARTEX=", proto, addr, int(port))
+	resp, err := d.Cmd("+CIPSTARTEX=", proto, addr, int(port))
 	fatalErr(err)
+
+	conn := resp.Conn
 	fmt.Println("connected")
 
 	// sender
