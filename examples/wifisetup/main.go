@@ -72,7 +72,7 @@ func main() {
 	case "0", "no", "false":
 		//
 	default:
-		fmt.Fprintln(os.Stderr, "IPv6 must be one of: 0, 1, no, yes, false, true.", err)
+		fmt.Fprintln(os.Stderr, "IPv6 must be one of: 0, 1, no, yes, false, true.")
 		os.Exit(1)
 	}
 

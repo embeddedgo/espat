@@ -74,6 +74,7 @@ func main() {
 	if *fr {
 		for msg := range d.Async() {
 			fatalErr(msg.Err)
+			fmt.Println(msg.Str)
 			if msg.Str == "WIFI GOT IP" {
 				break
 			}

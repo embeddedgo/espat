@@ -44,7 +44,8 @@ waitForIP:
 	for {
 		select {
 		case msg := <-dev.Async():
-			if msg == "WIFI GOT IP" {
+			fatalErr(msg.Err)
+			if msg.Str == "WIFI GOT IP" {
 				break waitForIP
 			}
 		case <-time.After(5 * time.Second):
@@ -67,7 +68,7 @@ waitForIP:
 			}
 			if err == io.EOF {
 				fatalErr(conn.Close())
-				os.Exit(0)
+				return
 			}
 			fatalErr(err)
 		}
@@ -83,7 +84,12 @@ waitForIP:
 		}
 		if err != nil {
 			if err == io.EOF {
-				break // connection closed by remote part
+				// There is no need to call Close after reading io.EOF because
+				// there are no any connection-related resources in espn (like
+				// file descriptors) that might not be released by GC. However,
+				// it is recommended for compatibility with the Go net package.
+				fatalErr(conn.Close())
+				return
 			}
 			fatalErr(err)
 		}

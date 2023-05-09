@@ -15,9 +15,7 @@ import (
 
 func logErr(err error) bool {
 	if err != nil {
-		if err != io.EOF {
-			fmt.Fprintln(os.Stderr, "error:", err)
-		}
+		fmt.Fprintln(os.Stderr, "error:", err)
 		return true
 	}
 	return false
@@ -32,7 +30,7 @@ func fatalErr(err error) {
 func main() {
 	if len(os.Args) != 3 {
 		fmt.Println("Usage:")
-		fmt.Println("  simpleserver UART_DEVICE PORT")
+		fmt.Println("  simpleserver UART_DEVICE 1:PORT")
 		fmt.Println()
 		fmt.Println("Example:")
 		fmt.Println("  simpleserver /dev/ttyUSB0 :1234")
@@ -52,7 +50,8 @@ waitForIP:
 	for {
 		select {
 		case msg := <-dev.Async():
-			if msg == "WIFI GOT IP" {
+			fatalErr(msg.Err)
+			if msg.Str == "WIFI GOT IP" {
 				break waitForIP
 			}
 		case <-time.After(5 * time.Second):
@@ -82,7 +81,12 @@ func handle(c net.Conn) {
 		}
 		var a, b float64
 		_, err = fmt.Fscanf(c, "%g %g\n", &a, &b)
-		if logErr(err) {
+		if err != nil {
+			if err == io.EOF {
+				logErr(c.Close())
+			} else {
+				logErr(err)
+			}
 			return
 		}
 		_, err = fmt.Fprintf(c, "\na=%g b=%g a+b=%g a*b=%g\n\n", a, b, a+b, a*b)

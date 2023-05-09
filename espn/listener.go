@@ -44,8 +44,7 @@ func ListenDev(d *espat.Device, network, address string) (*Listener, error) {
 
 // Accept works like the net.Listener Accept method.
 func (ls *Listener) Accept() (*Conn, error) {
-	c := <-ls.d.Server()
-	return newConn(ls.d, c)
+	return newConn(<-ls.d.Server())
 }
 
 // Close works like the net.Listener Close method.

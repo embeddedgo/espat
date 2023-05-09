@@ -14,9 +14,7 @@ import (
 
 func logErr(err error) bool {
 	if err != nil {
-		if err != io.EOF {
-			fmt.Fprintln(os.Stderr, "error:", err)
-		}
+		fmt.Fprintln(os.Stderr, "error:", err)
 		return true
 	}
 	return false
@@ -51,7 +49,8 @@ waitForIP:
 	for {
 		select {
 		case msg := <-dev.Async():
-			if msg == "WIFI GOT IP" {
+			fatalErr(msg.Err)
+			if msg.Str == "WIFI GOT IP" {
 				break waitForIP
 			}
 		case <-time.After(5 * time.Second):
@@ -73,7 +72,6 @@ waitForIP:
 
 func handle(c *espn.Conn) {
 	fmt.Printf("- new connection: %s -> %s\n", c.RemoteAddr(), c.LocalAddr())
-	defer c.Close()
 	for {
 		_, err := fmt.Fprint(c, "Enter two numbers separated by a space: ")
 		if logErr(err) {
@@ -81,7 +79,16 @@ func handle(c *espn.Conn) {
 		}
 		var a, b float64
 		_, err = fmt.Fscanf(c, "%g %g\n", &a, &b)
-		if logErr(err) {
+		if err != nil {
+			if err == io.EOF {
+				// There is no need to call Close after reading io.EOF because
+				// there are no any connection-related resources in espn (like
+				// file descriptors) that might not be released by GC. However,
+				// it is recommended for compatibility with the Go net package.
+				logErr(c.Close())
+			} else {
+				logErr(err)
+			}
 			return
 		}
 		_, err = fmt.Fprintf(c, "\na=%g b=%g a+b=%g a*b=%g\n\n", a, b, a+b, a*b)

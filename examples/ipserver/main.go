@@ -69,7 +69,9 @@ func main() {
 
 	if *fr {
 		for msg := range d.Async() {
-			if msg == "WIFI GOT IP" {
+			fatalErr(msg.Err)
+			fmt.Println(msg.Str)
+			if msg.Str == "WIFI GOT IP" {
 				break
 			}
 		}
@@ -86,14 +88,15 @@ func main() {
 	fmt.Println("Waiting for TCP connections...")
 
 	for conn := range d.Server() {
-		go handle(d, conn, *fa)
+		go handle(conn, *fa)
 	}
 }
 
 var welcome = []byte("Welcome to the Echo Server!\r\n")
 
-func handle(d *espat.Device, conn *espat.Conn, active bool) {
-	err := send(d, conn, welcome)
+func handle(conn *espat.Conn, active bool) {
+	fmt.Println("connect", conn.ID)
+	err := send(conn, welcome)
 	if logErr(err) {
 		return
 	}
@@ -101,9 +104,10 @@ func handle(d *espat.Device, conn *espat.Conn, active bool) {
 		for {
 			data, ok := <-conn.Ch
 			if !ok {
+				fmt.Println("close", conn.ID)
 				return // connection closed by remote part
 			}
-			if logErr(send(d, conn, data)) {
+			if logErr(send(conn, data)) {
 				return
 			}
 		}
@@ -111,20 +115,22 @@ func handle(d *espat.Device, conn *espat.Conn, active bool) {
 		var buf [128]byte
 		for {
 			if _, ok := <-conn.Ch; !ok {
-				break // connection closed by remote part
+				fmt.Println("close", conn.ID)
+				return // connection closed by remote part
 			}
-			n, err := d.CmdInt("+CIPRECVDATA=", buf[:], conn.ID, len(buf))
+			n, err := conn.Dev.CmdInt("+CIPRECVDATA=", buf[:], conn.ID, len(buf))
 			if logErr(err) {
 				return
 			}
-			if logErr(send(d, conn, buf[:n])) {
+			if logErr(send(conn, buf[:n])) {
 				return
 			}
 		}
 	}
 }
 
-func send(d *espat.Device, conn *espat.Conn, p []byte) error {
+func send(conn *espat.Conn, p []byte) error {
+	d := conn.Dev
 	d.Lock()
 	defer d.Unlock()
 	if _, err := d.UnsafeCmd("+CIPSEND=", conn.ID, len(p)); err != nil {

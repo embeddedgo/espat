@@ -8,8 +8,8 @@ import (
 	"github.com/embeddedgo/espat/espn"
 )
 
-// Conn is an implementation of the net.Conn interface for TCP and UDP network
-// connections.
+// A Conn is a simple wrapper over the espn.Conn that implementats the net.Conn
+// interface for TCP and UDP network connections.
 type Conn espn.Conn
 
 // DialDev works like net.Dial.

@@ -71,7 +71,8 @@ func main() {
 		for {
 			select {
 			case msg := <-dev.Async():
-				if msg == "WIFI GOT IP" {
+				fatalErr(msg.Err)
+				if msg.Str == "WIFI GOT IP" {
 					break waitForIP
 				}
 			case <-time.After(5 * time.Second):
@@ -109,7 +110,7 @@ func main() {
 			}
 			if err == io.EOF {
 				fatalErr(conn.Close())
-				os.Exit(0)
+				return
 			}
 			fatalErr(err)
 		}
@@ -129,7 +130,9 @@ func main() {
 		}
 		if err != nil {
 			if err == io.EOF {
-				break // connection closed by remote part
+				fatalErr(conn.Close())
+				fmt.Println("\r\n[closed]\r\n")
+				return
 			}
 			fatalErr(err)
 		}

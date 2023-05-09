@@ -59,7 +59,7 @@ func (d *Device) SetServer(en bool) {
 //	AT+SYSLOG=1
 //
 // If reset is true (recomended) it resets the device and waits for the ready
-// state (for 3 second max.) before executing the above commands.
+// state (2 second max.) before executing the above commands.
 func (d *Device) Init(reset bool) error {
 	if reset {
 	emptying:

@@ -13,7 +13,6 @@ import (
 
 // A Conn represents a TCP or UDP conection.
 type Conn struct {
-	dev           *espat.Device
 	conn          *espat.Conn
 	readTimer     *time.Timer
 	writeDeadline time.Time
@@ -32,15 +31,15 @@ func DialDev(d *espat.Device, network, address string) (*Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newConn(d, conn)
+	return newConn(conn)
 }
 
-func newConn(d *espat.Device, conn *espat.Conn) (*Conn, error) {
-	sas, err := getSockAddrs(d)
+func newConn(conn *espat.Conn) (*Conn, error) {
+	sas, err := getSockAddrs(conn.Dev)
 	if err != nil {
 		return nil, err
 	}
-	c := &Conn{dev: d, conn: conn, readTimer: time.NewTimer(0)}
+	c := &Conn{conn: conn, readTimer: time.NewTimer(0)}
 	ci := conn.ID
 	if ci < 0 {
 		ci = 0
@@ -89,7 +88,7 @@ func (c *Conn) Read(p []byte) (n int, err error) {
 			return
 		}
 	case <-c.readTimer.C: // timeout
-		return 0, &espat.Error{c.dev.Name(), "read", espat.ErrTimeout}
+		return 0, &espat.Error{c.conn.Dev.Name(), "read", espat.ErrTimeout}
 	}
 	// passive mode
 	var args [3]any
@@ -100,7 +99,7 @@ func (c *Conn) Read(p []byte) (n int, err error) {
 		ai++
 	}
 	args[ai] = len(p)
-	n, err = c.dev.CmdInt("+CIPRECVDATA=", args[:ai+1]...)
+	n, err = c.conn.Dev.CmdInt("+CIPRECVDATA=", args[:ai+1]...)
 	return
 }
 
@@ -111,17 +110,17 @@ func send(c *Conn, n int) (m int, err error) {
 		args[ai] = c.conn.ID
 		ai++
 	}
-	c.dev.Lock()
+	c.conn.Dev.Lock()
 	if !c.writeDeadline.IsZero() {
 		to := int(c.writeDeadline.Sub(time.Now()) / time.Millisecond)
 		if to <= 0 {
-			err = &espat.Error{c.dev.Name(), "read", espat.ErrTimeout}
+			err = &espat.Error{c.conn.Dev.Name(), "read", espat.ErrTimeout}
 			return
 		}
 		args[ai+0] = -1
 		args[ai+1] = 0
 		args[ai+2] = to
-		_, err = c.dev.UnsafeCmd("+CIPTCPOPT=", args[:ai+3]...)
+		_, err = c.conn.Dev.UnsafeCmd("+CIPTCPOPT=", args[:ai+3]...)
 		if err != nil {
 			return
 		}
@@ -131,7 +130,7 @@ func send(c *Conn, n int) (m int, err error) {
 		m = 2048
 	}
 	args[ai] = m
-	_, err = c.dev.UnsafeCmd("+CIPSEND=", args[:ai+1]...)
+	_, err = c.conn.Dev.UnsafeCmd("+CIPSEND=", args[:ai+1]...)
 	return
 }
 
@@ -141,14 +140,14 @@ func (c *Conn) Write(p []byte) (n int, err error) {
 		var m int
 		m, err = send(c, len(p))
 		if err == nil {
-			m, err = c.dev.UnsafeWrite(p[:m])
+			m, err = c.conn.Dev.UnsafeWrite(p[:m])
 			if err == nil {
-				_, err = c.dev.UnsafeCmd("")
+				_, err = c.conn.Dev.UnsafeCmd("")
 				n += m
 				p = p[m:]
 			}
 		}
-		c.dev.Unlock()
+		c.conn.Dev.Unlock()
 		if err != nil {
 			break
 		}
@@ -162,14 +161,14 @@ func (c *Conn) WriteString(p string) (n int, err error) {
 		var m int
 		m, err = send(c, len(p))
 		if err == nil {
-			m, err = c.dev.UnsafeWriteString(p[:m])
+			m, err = c.conn.Dev.UnsafeWriteString(p[:m])
 			if err == nil {
-				_, err = c.dev.UnsafeCmd("")
+				_, err = c.conn.Dev.UnsafeCmd("")
 				n += m
 				p = p[m:]
 			}
 		}
-		c.dev.Unlock()
+		c.conn.Dev.Unlock()
 		if err != nil {
 			break
 		}
@@ -179,6 +178,14 @@ func (c *Conn) WriteString(p string) (n int, err error) {
 
 // Close works like the net.Conn Close method.
 func (c *Conn) Close() error {
+	select {
+	case _, ok := <-c.conn.Ch:
+		if !ok {
+			// already closed by the remote part
+			return nil
+		}
+	default:
+	}
 	var (
 		args [1]any
 		an   int
@@ -190,7 +197,7 @@ func (c *Conn) Close() error {
 		args[0] = c.conn.ID
 		an = 1
 	}
-	_, err := c.dev.Cmd(cmd, args[:an]...)
+	_, err := c.conn.Dev.Cmd(cmd, args[:an]...)
 	return err
 }
 
@@ -211,9 +218,9 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 
 // SetWriteDeadline works like the net.Conn SetWriteDeadline method.
 func (c *Conn) SetWriteDeadline(t time.Time) error {
-	c.dev.Lock() // use device mutex to avoid locking two mutexes in send
+	c.conn.Dev.Lock() // use device mutex to avoid another mutex for this
 	c.writeDeadline = t
-	c.dev.Unlock() // immediately unlocked so it shouldn't be very inefficient
+	c.conn.Dev.Unlock() // immediately unlocked so shouldn't be very inefficient
 	return nil
 }
 

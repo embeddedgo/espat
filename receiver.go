@@ -151,7 +151,7 @@ func receiverLoop(dev *Device, inp io.Reader) {
 			cmd.ready.Unlock()
 			continue
 		}
-		if err == bufio.ErrBufferFull || line[len(line)-2] != '\r' {
+		if n := len(line); err == bufio.ErrBufferFull || n < 2 || line[n-2] != '\r' {
 			sb.Write(line)
 			continue
 		}

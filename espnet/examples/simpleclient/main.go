@@ -44,7 +44,8 @@ waitForIP:
 	for {
 		select {
 		case msg := <-dev.Async():
-			if msg == "WIFI GOT IP" {
+			fatalErr(msg.Err)
+			if msg.Str == "WIFI GOT IP" {
 				break waitForIP
 			}
 		case <-time.After(5 * time.Second):
@@ -67,7 +68,7 @@ waitForIP:
 			}
 			if err == io.EOF {
 				fatalErr(conn.Close())
-				os.Exit(0)
+				return
 			}
 			fatalErr(err)
 		}
@@ -83,7 +84,8 @@ waitForIP:
 		}
 		if err != nil {
 			if err == io.EOF {
-				break // connection closed by remote part
+				fatalErr(conn.Close())
+				return
 			}
 			fatalErr(err)
 		}

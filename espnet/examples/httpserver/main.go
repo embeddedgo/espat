@@ -48,7 +48,8 @@ waitForIP:
 	for {
 		select {
 		case msg := <-dev.Async():
-			if msg == "WIFI GOT IP" {
+			fatalErr(msg.Err)
+			if msg.Str == "WIFI GOT IP" {
 				break waitForIP
 			}
 		case <-time.After(5 * time.Second):
