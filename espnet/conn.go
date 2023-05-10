@@ -8,7 +8,7 @@ import (
 	"github.com/embeddedgo/espat/espn"
 )
 
-// A Conn is a simple wrapper over the espn.Conn that implementats the net.Conn
+// A Conn is a simple wrapper over the espn.Conn that implements the net.Conn
 // interface for TCP and UDP network connections.
 type Conn espn.Conn
 

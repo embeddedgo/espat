@@ -178,6 +178,7 @@ func (c *Conn) WriteString(p string) (n int, err error) {
 
 // Close works like the net.Conn Close method.
 func (c *Conn) Close() error {
+	c.readTimer.Stop()
 	select {
 	case _, ok := <-c.conn.Ch:
 		if !ok {
