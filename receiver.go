@@ -41,7 +41,7 @@ const maxConns = 10 // keep in sync with espnet/sockaddr.go
 type receiver struct {
 	cmd    chan *cmd
 	async  chan Async
-	server atomic.Value
+	server atomic.Pointer[chan *Conn]
 	conns  [maxConns]chan []byte
 }
 
@@ -207,7 +207,7 @@ func receiverLoop(dev *Device, inp io.Reader) {
 				rcv.conns[ci] = ch
 				conn := &Conn{dev, id, ch}
 				if srv := rcv.server.Load(); srv != nil {
-					srv.(chan *Conn) <- conn
+					*srv <- conn
 				} else {
 					resp.Conn = conn
 				}

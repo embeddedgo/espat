@@ -41,15 +41,16 @@ func (d *Device) Async() <-chan Async {
 
 // Server returns the server channel. See also SetServer.
 func (d *Device) Server() <-chan *Conn {
-	return d.receiver.server.Load().(chan *Conn)
+	return *d.receiver.server.Load()
 }
 
 // SetServer enables the server channel. See also Server.
 func (d *Device) SetServer(en bool) {
 	if en {
-		d.receiver.server.Store(make(chan *Conn, maxConns))
+		c := make(chan *Conn, maxConns)
+		d.receiver.server.Store(&c)
 	} else {
-		d.receiver.server.Store((chan *Conn)(nil))
+		d.receiver.server.Store(nil)
 	}
 }
 
