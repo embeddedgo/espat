@@ -20,6 +20,7 @@ type Device struct {
 // the returned device.
 func NewDevice(name string, r io.Reader, w io.Writer) *Device {
 	d := &Device{name: name, cmdq: make(chan *cmd, 3), w: w}
+	d.cmdx.Lock() // to delay Init(true), will be unlocked by receiverLoop
 	receiverInit(&d.receiver)
 	go receiverLoop(d, r)
 	go processCmd(d)
@@ -63,19 +64,22 @@ func (d *Device) SetServer(en bool) {
 // state (2 second max.) before executing the above commands.
 func (d *Device) Init(reset bool) error {
 	if reset {
+		d.cmdx.Lock()
+		timeout := time.After(50 * time.Millisecond)
 	emptying:
 		for {
 			select {
 			case <-d.Async():
 				//
-			default:
+			case <-timeout:
 				break emptying
 			}
 		}
+		d.cmdx.Unlock()
 		if _, err := d.Cmd("+RST"); err != nil {
 			return err
 		}
-		timeout := time.After(2 * time.Second)
+		timeout = time.After(2 * time.Second)
 	waiting:
 		for {
 			select {

@@ -59,8 +59,10 @@ func receiverLoop(dev *Device, inp io.Reader) {
 	)
 	rcv := &dev.receiver
 	r := bufio.NewReaderSize(inp, 128)
+	dev.cmdx.Unlock()
 	for {
 		line, err := r.ReadSlice('\n')
+		//os.Stdout.Write(line)
 		if err != nil && err != bufio.ErrBufferFull {
 			rerr = err
 			goto sendAsync
